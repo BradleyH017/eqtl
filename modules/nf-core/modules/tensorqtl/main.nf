@@ -163,7 +163,7 @@ process TRANS_BY_CIS_TEST_OPTIM_OUT{
           inter_name = "NA"
           outpath_end = "base_output__base"
           }
-      outpath = "${sumstats_path}/OPTIM_pcs/${outpath_end}"
+      outpath = "${sumstats_path}OPTIM_pcs/${outpath_end}"
     
       // Get the top result
       inputFile = file("${outpath}/optim_pcs.txt")
@@ -171,7 +171,7 @@ process TRANS_BY_CIS_TEST_OPTIM_OUT{
       optim_value = value + "pcs"
 
       // Define the qval results file
-      qval_file="${sumstats_path}/${nr_phenotype_pcs}/base_output/base/Cis_eqtls_qval.tsv"
+      qval_file="${sumstats_path}${nr_phenotype_pcs}/base_output/base/Cis_eqtls_qval.tsv"
 
       // Execute if top result nPC and use value are the same    
       if (nr_phenotype_pcs == optim_value) {
@@ -185,7 +185,7 @@ process TRANS_BY_CIS_TEST_OPTIM_OUT{
         tensor_analyse_trans_by_cis.py \
           --covariates_file ${covariates_tsv} \
           --expression_bed Expression_Data.bed.gz \
-          --plink_prefix_path ${plink_files_prefix} \
+          --plink_prefix_path ${plink_files_prefix}/plink_genotypes \
           --outdir ${outpath} \
           --dosage ${dosage} \
           --maf "0.05" \

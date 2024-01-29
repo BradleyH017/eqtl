@@ -140,9 +140,24 @@ def main():
     # Read in the phenotype file (for this test)
     phenotype_df, phenotype_pos_df = read_phenotype_bed(expression_bed)
     print("Loaded phenotypes")
+    
+    # Check the execution dir and modify the input so is absolute
+    exec_dir = os.getcwd()
+    # Print or use the launch directory as needed
+    print("Nextflow exec Directory:", exec_dir)
+    index = exec_dir.find("work")
+    if index != -1:
+        # Remove "work" and everything after it
+        repo_dir_base = exec_dir[:index]
+    else:
+        # "work" not found, keep the original path
+        repo_dir_base = exec_dir
+    
+    complete_res_input=f"{repo_dir_base}{cis_qval_results}"
+    print(f"The input dir for the cis q file is: {complete_res_input}") 
 
     # Load in the cis-qval significant results
-    cis_q = pd.read_csv(cis_qval_results, sep = "\t")
+    cis_q = pd.read_csv(complete_res_input, sep = "\t")
     sig_variants = cis_q[cis_q['qval'] < alpha]['variant_id']
 
     # Load in the genotypes / dosages - Need to make sure this is adjusted to incorporate whether or not we want to limit to the variants only with a cis-effect
@@ -190,12 +205,12 @@ def main():
     print("FDR corrected and sorted")
 
     # Save the bonferoni/FDR corrected results
-    trans_df_bonf_sorted.to_csv(f"{outdir}/trans-by-cis_bonf_fdr.tsv", sep = "\t")
+    trans_df_bonf_sorted.to_csv(f"{repo_dir_base}{outdir}/trans-by-cis_bonf_fdr.tsv", sep = "\t", index=False)
     print("Saved the corrected results")
 
     # Save all results
     #print("Saving all trans results")
-    #trans_df.to_csv(f"{outdir}/trans-by-cis_all.tsv.gz", compression='gzip', sep = "\t")
+    #trans_df.to_csv(f"{repo_dir_base}{outdir}/trans-by-cis_all.tsv.gz", compression='gzip', sep = "\t", index=False)
 
 
 if __name__ == '__main__':
