@@ -55,4 +55,4 @@ nextflow run ${EQTL_REPO} -profile sanger -c ${INPUT} -resume
 # Execute:
 # module load ISG/singularity/3.6.4
 # module load HGI/common/nextflow/22.04.4
-# sh run_nfeqtl.sh
+# sh run_nf_eqtl.sh
