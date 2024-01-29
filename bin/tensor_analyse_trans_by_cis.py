@@ -122,6 +122,7 @@ def main():
     # plink="Secretory_plink_genotypes"
     # cis_qval_results="Cis_eqtls_qval.tsv"
     # alpha = 0.01
+    # optim_npheno=32
 
     # Get the script args
     options = parser.parse_args()
@@ -134,6 +135,7 @@ def main():
     maf=float(options.maf)
     cis_qval_results=options.cis_qval_results
     alpha = float(options.alpha)
+    optim_npheno = float(options.alpha)
 
     # Read in the phenotype file (for this test)
     phenotype_df, phenotype_pos_df = read_phenotype_bed(expression_bed)
@@ -192,8 +194,8 @@ def main():
     print("Saved the corrected results")
 
     # Save all results
-    print("Saving all trans results")
-    trans_df.to_csv(f"{outdir}/trans-by-cis_all.tsv.gz", compression='gzip', sep = "\t")
+    #print("Saving all trans results")
+    #trans_df.to_csv(f"{outdir}/trans-by-cis_all.tsv.gz", compression='gzip', sep = "\t")
 
 
 if __name__ == '__main__':
