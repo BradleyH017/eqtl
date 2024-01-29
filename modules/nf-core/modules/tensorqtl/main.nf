@@ -116,17 +116,15 @@ process OPTIMISE_PCS{
         """
 }
 
-
-process TRANS_BY_CIS{
+// Make a test script to see the iput of params
+process TRANS_BY_CIS_TEST{
 
     // Subset for significant cis-eQTL effects and perform trans-by-cis analysis within each condition
     // ------------------------------------------------------------------------
-      tag { condition }
-      scratch false      // use tmp directory
-      label 'process_low'
-      errorStrategy 'ignore'
+    label "${tensor_label}"
+    tag "$condition, $nr_phenotype_pcs"
 
-     publishDir  path: "${params.outdir}/TensorQTL_eQTLS/${condition}",
+    publishDir  path: "${params.outdir}/TensorQTL_eQTLS/${condition}",
                 mode: "copy",
                 overwrite: "true"
 
@@ -137,28 +135,106 @@ process TRANS_BY_CIS{
     }
 
     input:
-      tuple(val(condition), path(eqtl_dir), path(optimise_nPCs),
-              path(optim_q_qtl_bin), path(plink_files_prefix), 
-              path(aggrnorm_counts_bed), path(covariates_tsv))
+      tuple(val(condition),path(aggrnorm_counts_bed),path(covariates_tsv),val(nr_phenotype_pcs))
+      each path(plink_files_prefix)
 
     output:
       path("${outpath}/trans-by-cis_bonf_fdr.tsv", emit: trans_res, optional: true)
     script:
-      // Defive outpath
-      sumstats_path = "${params.outdir}/TensorQTL_eQTLS/${condition}/"
-        if (params.TensorQTL.interaction_file?.trim()) {
-          inter_name = file(params.TensorQTL.interaction_file).baseName
-          outpath_end = "interaction_output__${inter_name}"
-        } else {
-          inter_name = "NA"
-          outpath_end = "base_output__base"
-        }
-      alpha = "0.05"
-      alpha_text = alpha.replaceAll("\\.", "pt")
-      outpath = "OPTIM_pcs/${outpath_end}"
+      //Check input
+      """
+      echo "Input Parameters for TRANS_BY_CIS process:"
+      echo "aggrnorm_counts_bed: ${aggrnorm_counts_bed}" >> ./test.txt
+      echo "covariates_tsv: ${covariates_tsv}" >> ./test.txt
+      echo "nr_phenotype_pcs: ${nr_phenotype_pcs}" >> ./test.txt
+      echo "plink_files_prefix: ${plink_files_prefix}" >> ./test.txt
+      """
+}
 
-      // Debug statement
-      println "DEBUG: outpath = ${outpath}"
+process TRANS_BY_CIS_TEST_OPTIM_OUT{
+
+    // Subset for significant cis-eQTL effects and perform trans-by-cis analysis within each condition
+    // ------------------------------------------------------------------------
+    label "${tensor_label}"
+    tag "$condition, $nr_phenotype_pcs"
+
+    publishDir  path: "${params.outdir}/TensorQTL_eQTLS/${condition}",
+                mode: "copy",
+                overwrite: "true"
+
+    if (workflow.containerEngine == 'singularity' && !params.singularity_pull_docker_container) {
+        container "${params.eqtl_container}"
+    } else {
+        container "${params.eqtl_docker}"
+    }
+
+    input:
+      path(optimise_nPCs_plot)
+      path(optimise_nPCs)
+      path(optim_qtl_bin)
+      path(optim_q_qtl_bin)
+      path(optim_int_qtl_bin)
+      path(outpath)
+
+    output:
+      path("${outpath}/trans-by-cis_bonf_fdr.tsv", emit: trans_res, optional: true)
+    script:
+      //Check input
+      """
+      echo "Input Parameters for TRANS_BY_CIS process:"
+      echo "optimise_nPCs_plot: ${optimise_nPCs_plot}" >> ./test.txt
+      echo "optimise_nPCs: ${optimise_nPCs}" >> ./test.txt
+      echo "optim_qtl_bin: ${optim_qtl_bin}" >> ./test.txt
+      echo "optim_q_qtl_bin: ${optim_q_qtl_bin}" >> ./test.txt
+      echo "optim_int_qtl_bin: ${optim_int_qtl_bin}" >> ./test.txt
+      echo "outpath: ${outpath}" >> ./test.txt
+      """
+}
+
+process TRANS_BY_CIS{
+
+    // Subset for significant cis-eQTL effects and perform trans-by-cis analysis within each condition
+    // ------------------------------------------------------------------------
+    label "${tensor_label}"
+    tag "$condition, $nr_phenotype_pcs"
+
+    publishDir  path: "${params.outdir}/TensorQTL_eQTLS/${condition}",
+                mode: "copy",
+                overwrite: "true"
+
+    if (workflow.containerEngine == 'singularity' && !params.singularity_pull_docker_container) {
+        container "${params.eqtl_container}"
+    } else {
+        container "${params.eqtl_docker}"
+    }
+
+    input:
+      tuple(val(condition),path(aggrnorm_counts_bed),path(covariates_tsv),val(nr_phenotype_pcs))
+      each path(plink_files_prefix)
+      path(optimise_nPCs_plot)
+      path(optimise_nPCs)
+      path(optim_qtl_bin)
+      path(optim_q_qtl_bin)
+      path(optim_int_qtl_bin)
+      path(outpath)
+
+    output:
+      path("${outpath}/trans-by-cis_bonf_fdr.tsv", emit: trans_res, optional: true)
+    script:
+      //Check input
+      """
+      echo "Input Parameters for TRANS_BY_CIS process:"
+      echo "aggrnorm_counts_bed: ${aggrnorm_counts_bed}"
+      echo "covariates_tsv: ${covariates_tsv}"
+      echo "nr_phenotype_pcs: ${nr_phenotype_pcs}"
+      echo "plink_files_prefix: ${plink_files_prefix}"
+      echo "optimise_nPCs_plot: ${optimise_nPCs_plot}"
+      echo "optimise_nPCs: ${optimise_nPCs}"
+      echo "optim_qtl_bin: ${optim_qtl_bin}"
+      echo "optim_q_qtl_bin: ${optim_q_qtl_bin}"
+      echo "optim_int_qtl_bin: ${optim_int_qtl_bin}"
+      echo "outpath: ${outpath}"
+      """
 
       // Use dosage?
       if (params.TensorQTL.use_gt_dosage) {
@@ -166,6 +242,7 @@ process TRANS_BY_CIS{
       }else{
         dosage = ""
       }
+      alpha= "0.05"
 
       // Get the optimal number of PCs
       optimal_pcs = """\$(grep TRUE ${outpath}/optimise_nPCs-FDR${alpha_text}.txt | cut -f 1)"""
@@ -211,7 +288,17 @@ workflow TENSORQTL_eqtls{
           PREP_OPTIMISE_PCS(prep_optim_pc_channel)
           // Run the optimisation to get the eQTL output with the most eGenes
           OPTIMISE_PCS(PREP_OPTIMISE_PCS.out)
-          //// Then perform the trans-by-cis analysis
-          TRANS_BY_CIS(OPTIMISE_PCS.out.optimise_nPCs)
+          if(params.TensorQTL.trans_by_cis){
+            log.info 'Running trans-by-cis analysis'
+            // TRANS_BY_CIS_TEST(condition_bed, plink_genotype)
+            TRANS_BY_CIS_TEST_OPTIM_OUT(OPTIMISE_PCS.out)
+            /*
+            //// Then perform the trans-by-cis analysis
+            TRANS_BY_CIS(
+              condition_bed,
+              plink_genotype,
+              OPTIMISE_PCS.out)
+              */
+          }
       }
 }
