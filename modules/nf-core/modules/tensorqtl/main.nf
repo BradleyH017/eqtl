@@ -116,49 +116,10 @@ process OPTIMISE_PCS{
         """
 }
 
-/*
-process SUBSET_CIS{
-     
-    // Subset the cis-eQTL effects so that the trans-by-cis analysis can be performed within each condition
-    // ------------------------------------------------------------------------
-    tag { condition }
-    scratch false      // use tmp directory
-    label 'process_low'
-    errorStrategy 'ignore'
-
-    publishDir  path: "${params.outdir}/TensorQTL_eQTLS/${condition}",
-                mode: "copy",
-                overwrite: "true"
-
-    if (workflow.containerEngine == 'singularity' && !params.singularity_pull_docker_container) {
-        container "${params.eqtl_container}"
-    } else {
-        container "${params.eqtl_docker}"
-    }
-    input:
-        path(optim_q_qtl_bin)
-        path(filtered_vcf)
-    output:
-        path("${outpath}/cis_q_filtered.vcf"), emit: cis_q_filtered_vcf
-        path("${outpath}/cis_q_plink_genotypes"), emit: plink_cis_path
-    script:
-
-      if(params.TensorQTL.use_gt_dosage==true && params.TensorQTL.run==true){
-        pgen_or_bed = "'dosage=DS' --make-pgen"
-      }else{
-        pgen_or_bed = "--make-bed"
-      }
-
-      """
-      { bcftools view -h ${filtered_vcf}; grep -Fwf <(awk '{print $7}' ${optim_q_qtl_bin}) <(bcftools view ${filtered_vcf});} > ${cis_q_filtered_vcf}
-      plink2 --vcf ${filtered_vcf} ${pgen_or_bed} ${params.plink2_filters} --hwe ${params.hwe} --out ${plink_cis_path}
-      """
-}
-
 
 process TRANS_BY_CIS{
 
-    // Subset the cis-eQTL effects so that the trans-by-cis analysis can be performed within each condition
+    // Subset for significant cis-eQTL effects and perform trans-by-cis analysis within each condition
     // ------------------------------------------------------------------------
       tag { condition }
       scratch false      // use tmp directory
@@ -176,18 +137,57 @@ process TRANS_BY_CIS{
     }
 
     input:
-      tuple(val(condition),path(aggrnorm_counts_bed),path(covariates_tsv),val(nr_phenotype_pcs))
-      path(plink_cis_path)
-      path(optimise_nPCs)
+      tuple(val(condition), path(eqtl_dir), path(optimise_nPCs),
+              path(optim_q_qtl_bin), path(plink_files_prefix), 
+              path(aggrnorm_counts_bed), path(covariates_tsv))
+
     output:
+      path("${outpath}/trans-by-cis_bonf_fdr.tsv", emit: trans_res, optional: true)
     script:
+      // Defive outpath
+      sumstats_path = "${params.outdir}/TensorQTL_eQTLS/${condition}/"
+        if (params.TensorQTL.interaction_file?.trim()) {
+          inter_name = file(params.TensorQTL.interaction_file).baseName
+          outpath_end = "interaction_output__${inter_name}"
+        } else {
+          inter_name = "NA"
+          outpath_end = "base_output__base"
+        }
+      alpha = "0.05"
+      alpha_text = alpha.replaceAll("\\.", "pt")
+      outpath = "OPTIM_pcs/${outpath_end}"
+
+      // Debug statement
+      println "DEBUG: outpath = ${outpath}"
+
+      // Use dosage?
+      if (params.TensorQTL.use_gt_dosage) {
+        dosage = "--dosage"
+      }else{
+        dosage = ""
+      }
+
+      // Get the optimal number of PCs
+      optimal_pcs = """\$(grep TRUE ${outpath}/optimise_nPCs-FDR${alpha_text}.txt | cut -f 1)"""
+
+      // Derive the expression bed file
       """
       bedtools sort -i ${aggrnorm_counts_bed} -header > Expression_Data.sorted.bed
-      var=\$(grep TRUE ${outpath}/optimise_nPCs-FDR${alpha_text}.txt | cut -f 1)
-
+      """
+      
+      // Execute association script
+      """
+      tensor_analyse_trans_by_cis.py \
+        --covariates_file ${covariates_tsv} \
+        --expression_bed Expression_Data.sorted.bed \
+        --plink_prefix_path ${plink_files_prefix} \
+        --outdir ${outpath} \
+        --dosage ${dosage} \
+        --maf "0.05" \
+        --cis_qval_results \
+        --alpha ${alpha}
       """
 }
-*/
 
 workflow TENSORQTL_eqtls{
     take:
@@ -211,9 +211,7 @@ workflow TENSORQTL_eqtls{
           PREP_OPTIMISE_PCS(prep_optim_pc_channel)
           // Run the optimisation to get the eQTL output with the most eGenes
           OPTIMISE_PCS(PREP_OPTIMISE_PCS.out)
-          //// Subset the variants for the cis-effects of this test
-          //SUBSET_CIS(OPTIMISE_PCS.out)
           //// Then perform the trans-by-cis analysis
-          //TRANS_BY_CIS(SUBSET_CIS.out)
+          TRANS_BY_CIS(OPTIMISE_PCS.out.optimise_nPCs)
       }
 }
