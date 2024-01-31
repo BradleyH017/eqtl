@@ -98,7 +98,7 @@ process OPTIMISE_PCS{
         path("${outpath}/Cis_eqtls_qval.tsv"), emit: optim_q_qtl_bin, optional: true
         path("${outpath}/cis_inter1.cis_qtl_top_assoc.txt.gz "), emit: optim_int_qtl_bin, optional: true
         path("${outpath}/optim_pcs.txt"), emit: optim_var, optional:true
-        path("${outpath}/Covariates.txt"), emit: optim_covariates, optional:true
+        path("${outpath}/Covariates.tsv"), emit: optim_covariates, optional:true
         path(outpath), emit: out_path, optional: true
     script:
     sumstats_path = "${params.outdir}/TensorQTL_eQTLS/${condition}/"
@@ -156,13 +156,18 @@ process TRANS_BY_CIS {
       // Define alpha value
       alpha = "0.05"
 
-      """
-      echo "Input condition: ${condition}" > ${condition}_test_params.txt
-      echo "Input aggrnorm_counts_bed: ${aggrnorm_counts_bed}" >> ${condition}_t_test_paramsest.txt
-      echo "Input covariates_tsv: ${optim_covariates}" >> ${condition}_test_params.txt
-      echo "Input nr_phenotype_pcs: ${nr_phenotype_pcs}" >> ${condition}_test_params.txt
-      echo "Input optim_q_qtl_bin: ${qval_file}" >> ${condition}_test_params.txt
+      // Define general outdir
+      sumstats_path = "${params.outdir}/TensorQTL_eQTLS/${condition}/"
+      if (params.TensorQTL.interaction_file?.trim()) {
+        inter_name = file(params.TensorQTL.interaction_file).baseName
+        outpath_end = "interaction_output__${inter_name}"
+      } else {
+        inter_name = "NA"
+        outpath_end = "base_output__base"
+      }
+      outpath = "../../../${sumstats_path}OPTIM_pcs/${outpath_end}"
 
+      """
       tensor_analyse_trans_by_cis.py \
         --covariates_file ${optim_covariates} \
         --expression_bed Expression_Data.bed.gz \
@@ -173,7 +178,11 @@ process TRANS_BY_CIS {
         --cis_qval_results ${optim_q_qtl_bin} \
         --alpha ${alpha} \
         --window ${params.windowSize}
+
+      cp -r ${out_path}/* ${outpath}
       """
+
+      
 }
 
 /*
