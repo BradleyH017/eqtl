@@ -146,6 +146,10 @@ def main():
 
     covariates_df=covariates_df.T
     # not a good solution but atm
+    
+    # Drop covariates into the outdir:
+    import shutil
+    shutil.copy(covariates_file, outdir)
 
     # covariates_df=covariates_df.set_index('IID')
     # to_keep = list(set(covariates_df.index).intersection(set(phenotype_df.columns)))
