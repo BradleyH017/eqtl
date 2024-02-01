@@ -58,12 +58,21 @@ def main():
     )
 
     parser.add_argument(
-        '-bed', '--expression_bed',
+        '-pf', '--phenotype_file',
         action='store',
-        dest='expression_bed',
+        dest='phenotype_file',
         required=True,
         help=''
     )
+    
+    parser.add_argument(
+        '-ppf', '--phenotype_pos_file',
+        action='store',
+        dest='phenotype_pos_file',
+        required=True,
+        help=''
+    )
+    
     parser.add_argument(
         '-plink', '--plink_prefix_path',
         action='store',
@@ -130,8 +139,10 @@ def main():
     print(f"Covariates: {covariates_file}")
     window=float(options.window)
     print(f"window: {str(window)}")
-    expression_bed=options.expression_bed
-    print(f"expression_bed: {expression_bed}")
+    phenotype_file=options.phenotype_file
+    print(f"phenotype_file: {phenotype_file}")
+    phenotype_pos_file=options.phenotype_file
+    print(f"phenotype_pos_file: {phenotype_pos_file}")
     plink_prefix_path=options.plink_prefix_path
     print(f"plink_prefix_path: {plink_prefix_path}")
     outdir=options.outdir
@@ -146,7 +157,8 @@ def main():
     print(f"alpha: {str(alpha)}")
 
     # Read in the phenotype file (for this test)
-    phenotype_df, phenotype_pos_df = read_phenotype_bed(expression_bed)
+    phenotype_df = pd.read_csv(phenotype_file, sep = "\t", index_col=0)
+    phenotype_pos_df = pd.read_csv(phenotype_pos_file, sep = "\t", index_col=0)
     print("Loaded phenotypes")
 
     # Load in the cis-qval significant results
@@ -162,10 +174,14 @@ def main():
             variant_df = variant_df[variant_df.index.isin(sig_variants)]
             print(f"Variants being tested = {genotype_df.shape[0]}")
             covariates_df = pd.read_csv(covariates_file, sep='\t', index_col=0)
+            #phenotype_df = phenotype_df.loc[:,phenotype_df.columns.isin(covariates_df.columns)]
+            #covariates_df = covariates_df.loc[:,covariates_df.columns.isin(phenotype_df.columns)]
             phenotype_df = phenotype_df[covariates_df.columns]
             # have to drop dublicate rownames. and average the repeated measures.
             phenotype_df.columns = phenotype_df.columns.str.split('.').str[0]
             covariates_df.columns = covariates_df.columns.str.split('.').str[0]
+            print(f"Shape of phenotype_df:{phenotype_df.shape}")
+            print(f"Shape of covariates_df:{covariates_df.shape}")
             print("Loaded genotypes, filtered genotypes and loaded covariates")
 
             covariates_df=covariates_df.loc[:,~covariates_df.columns.duplicated()]
@@ -174,6 +190,7 @@ def main():
 
             covariates_df=covariates_df.T
             # Run test
+            print("Running trans analysis")
             trans_df_all = trans.map_trans(genotype_df, phenotype_df.loc[phenotype_pos_df['chr']!='chrY'],
                                 covariates_df = covariates_df, batch_size=10000,
                                 return_sparse=True, pval_threshold=1, maf_threshold=0.05)
@@ -190,7 +207,7 @@ def main():
             # Subset for top hit/gene 
             trans_df_bonf = trans_df.loc[trans_df.groupby('phenotype_id')['pval_bonf'].idxmin()]
 
-            # Ceiling the bong before fdr
+            # Ceiling the bonf before fdr
             trans_df_bonf['pval_bonf'] = trans_df_bonf['pval_bonf'].apply(lambda x: 1 if x > 1 else x)
 
             # FDR across genes (This ccounts for the number of genes tested and allows results to be comparable across the conditions with different nGenes)
@@ -200,12 +217,12 @@ def main():
             print("FDR corrected and sorted")
 
             # Save the bonferoni/FDR corrected results
-            trans_df_bonf_sorted.to_csv(f"{outdir}/{outdir}/trans-by-cis_bonf_fdr.tsv", sep = "\t", index=False)
+            trans_df_bonf_sorted.to_csv(f"{outdir}/trans-by-cis_bonf_fdr.tsv", sep = "\t", index=False)
             print("Saved the corrected results")
             
             # Save all results
             #print("Saving all trans results")
-            #trans_df.to_csv(f"{outdir}/{outdir}/trans-by-cis_all.tsv.gz", compression='gzip', sep = "\t", index=False)
+            #trans_df.to_csv(f"{outdir}/trans-by-cis_all.tsv.gz", compression='gzip', sep = "\t", index=False)
     
     else:
        print("No significant variants at this nPC") 
