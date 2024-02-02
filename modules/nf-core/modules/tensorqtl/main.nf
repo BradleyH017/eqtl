@@ -21,7 +21,9 @@ process TENSORQTL {
 
   output:
     tuple val(condition), path("${outpath}"), emit: pc_qtls_path
-    path("${outpath}/Cis_eqtls_qval.tsv"), emit: qval_file // Emit the qval_file as output    
+    path("${outpath}/Cis_eqtls_qval.tsv"), emit: qval_file // Emit the qval_file as output   
+    path("${outpath}/phenotype_df.tsv"), emit: phenotype_file
+    path("${outpath}/phenotype_pos_df.tsv"), emit: phenotype_pos_file
 
 
   script:
@@ -99,6 +101,8 @@ process OPTIMISE_PCS{
         path("${outpath}/cis_inter1.cis_qtl_top_assoc.txt.gz "), emit: optim_int_qtl_bin, optional: true
         path("${outpath}/optim_pcs.txt"), emit: optim_var, optional:true
         path("${outpath}/Covariates.tsv"), emit: optim_covariates, optional:true
+        path("${outpath}/phenotype_df.tsv"), emit: optim_phenotype_file
+        path("${outpath}/phenotype_pos_df.tsv"), emit: optim_phenotype_pos_file
         path(outpath), emit: out_path, optional: true
     script:
     sumstats_path = "${params.outdir}/TensorQTL_eQTLS/${condition}/"
@@ -132,19 +136,21 @@ process TRANS_BY_CIS {
     }
 
     publishDir  path: "${params.outdir}/TensorQTL_eQTLS/${condition}",
-                mode: "copy"
+                mode: "copy",
+                overwrite: "true"
 
     input:
-        tuple(val(condition),path(aggrnorm_counts_bed))
+        tuple(val(condition),path(eqtl_dir))
         each path(plink_files_prefix) 
         path(optim_q_qtl_bin)
         path(optim_covariates)
-        path(out_path)
-    
+        path(optim_phenotype_file)
+        path(optim_phenotype_pos_file)
+
     output:
-        path("${condition}_test_params.txt")
-        path("${outpath}/trans-by-cis_bonf_fdr.tsv", emit: trans_res, optional: true)
-    
+        //path("${outpath}/trans-by-cis_bonf_fdr.tsv", emit: trans_res, optional: true)
+        path("trans-by-cis_bonf_fdr.tsv", emit: trans_res, optional: true)
+
     script:
       // Use dosage?
       if (params.TensorQTL.use_gt_dosage) {
@@ -155,8 +161,8 @@ process TRANS_BY_CIS {
 
       // Define alpha value
       alpha = "0.05"
-
-      // Define general outdir
+      
+      /*// Define general outdir
       sumstats_path = "${params.outdir}/TensorQTL_eQTLS/${condition}/"
       if (params.TensorQTL.interaction_file?.trim()) {
         inter_name = file(params.TensorQTL.interaction_file).baseName
@@ -165,123 +171,29 @@ process TRANS_BY_CIS {
         inter_name = "NA"
         outpath_end = "base_output__base"
       }
-      outpath = "../../../${sumstats_path}OPTIM_pcs/${outpath_end}"
+      */
+      outpath = "${launchDir}/results/TensorQTL_eQTLS/${condition}/OPTIM_pcs/base_output__base/"
 
       """
       tensor_analyse_trans_by_cis.py \
         --covariates_file ${optim_covariates} \
-        --expression_bed Expression_Data.bed.gz \
+        --phenotype_file ${optim_phenotype_file} \
+        --phenotype_pos_file ${optim_phenotype_pos_file} \
         --plink_prefix_path ${plink_files_prefix}/plink_genotypes \
-        --outdir ${out_path} \
+        --outdir "./" \
         --dosage ${dosage} \
         --maf "0.05" \
         --cis_qval_results ${optim_q_qtl_bin} \
         --alpha ${alpha} \
         --window ${params.windowSize}
 
-      cp -r ${out_path}/* ${outpath}
+      echo ${outpath} > copydir.txt
       """
+      //cp trans-by-cis_bonf_fdr.tsv ${outpath}
+      //"""
 
       
 }
-
-/*
-// Execute trans by cis
-process TRANS_BY_CIS_OLD{
-
-    // Subset for significant cis-eQTL effects and perform trans-by-cis analysis within each condition
-    // ------------------------------------------------------------------------
-    label "${tensor_label}"
-    tag "$condition, $nr_phenotype_pcs"
-
-    publishDir  path: "${params.outdir}/TensorQTL_eQTLS/${condition}",
-                mode: "copy",
-                overwrite: "true"
-
-    if (workflow.containerEngine == 'singularity' && !params.singularity_pull_docker_container) {
-        container "${params.eqtl_container}"
-    } else {
-        container "${params.eqtl_docker}"
-    }
-
-    input:
-      tuple(val(condition),path(aggrnorm_counts_bed),path(covariates_tsv),val(nr_phenotype_pcs))
-      each path(plink_files_prefix)
-      tuple val(condition), path("${condition}_symlink")
-      tuple(val(condition), file(optim_var))
-      tuple(val(condition), file(optim_q_qtl_bin))
-    output:
-      path("${outpath}/trans-by-cis_bonf_fdr.tsv", emit: trans_res, optional: true)
-    script:
-
-      // Use dosage?
-      if (params.TensorQTL.use_gt_dosage) {
-        dosage = "--dosage"
-      }else{
-        dosage = ""
-      }
-
-      // Define alpha value
-      alpha = "0.05"
-
-      // Generate the sumstats path
-      sumstats_path = "${params.outdir}/TensorQTL_eQTLS/${condition}/"
-        if (params.TensorQTL.interaction_file?.trim()) {
-          inter_name = file(params.TensorQTL.interaction_file).baseName
-          outpath_end = "interaction_output__${inter_name}"
-      } else {
-          inter_name = "NA"
-          outpath_end = "base_output__base"
-          }
-      outpath = "./OPTIM_pcs/${outpath_end}"
-    
-      // Get the top result
-      def value = ${optim_var}.text.trim()
-      optim_value = value + "pcs"
-
-      // Define the qval results file
-      // qval_file="${sumstats_path}${nr_phenotype_pcs}/base_output/base/Cis_eqtls_qval.tsv"
-
-      // Execute script, defininig whether or not it runs within the shell commands
-      """
-      echo ${optim_value} > temp.txt
-      echo ${nr_phenotype_pcs} > temp2.txt
-      if [ "${optim_value}" = "${nr_phenotype_pcs}" ]; then
-        echo "yes" >> trans_run.txt
-      else
-        echo "not run, not optimum" >> trans_run.txt
-      fi
-      """
-
-      // Execute if top result nPC and use value are the same    
-      if (nr_phenotype_pcs == optim_value) {
-        // Specify whether trans is ran
-        """
-        echo ${nr_phenotype_pcs} >> trans_run.txt
-        echo "yes" >> trans_run.txt
-        """
-        // Run trans test
-        """
-        tensor_analyse_trans_by_cis.py \
-          --covariates_file ${covariates_tsv} \
-          --expression_bed Expression_Data.bed.gz \
-          --plink_prefix_path ${plink_files_prefix}/plink_genotypes \
-          --outdir ${outpath} \
-          --dosage ${dosage} \
-          --maf "0.05" \
-          --cis_qval_results ${optim_q_qtl_bin} \
-          --alpha ${alpha} \
-          --window ${params.windowSize}
-        
-        cp -r ${condition}_symlink/"\$var"pcs__${outpath_end}/* ${outpath}
-        """
-      } else {
-        """
-        echo "not run, not optimum" >> trans_run.txt
-        """
-      }
-}
-*/
 
 workflow TENSORQTL_eqtls{
     take:
@@ -308,11 +220,12 @@ workflow TENSORQTL_eqtls{
           if(params.TensorQTL.trans_by_cis){
             log.info 'Running trans-by-cis analysis on optimum nPCs'
             TRANS_BY_CIS(
-              condition_bed,
+              PREP_OPTIMISE_PCS.out,
               plink_genotype,
               OPTIMISE_PCS.out.optim_q_qtl_bin,
               OPTIMISE_PCS.out.optim_covariates,
-              OPTIMISE_PCS.out.out_path
+              OPTIMISE_PCS.out.optim_phenotype_file,
+              OPTIMISE_PCS.out.optim_phenotype_pos_file
             )
           } 
   }

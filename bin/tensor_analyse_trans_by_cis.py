@@ -141,7 +141,7 @@ def main():
     print(f"window: {str(window)}")
     phenotype_file=options.phenotype_file
     print(f"phenotype_file: {phenotype_file}")
-    phenotype_pos_file=options.phenotype_file
+    phenotype_pos_file=options.phenotype_pos_file
     print(f"phenotype_pos_file: {phenotype_pos_file}")
     plink_prefix_path=options.plink_prefix_path
     print(f"plink_prefix_path: {plink_prefix_path}")
@@ -206,6 +206,9 @@ def main():
 
             # Subset for top hit/gene 
             trans_df_bonf = trans_df.loc[trans_df.groupby('phenotype_id')['pval_bonf'].idxmin()]
+
+            ## Subset for significant effects within gene
+            #trans_df_bonf = trans_df.loc[trans_df['pval_bonf'] < alpha]
 
             # Ceiling the bonf before fdr
             trans_df_bonf['pval_bonf'] = trans_df_bonf['pval_bonf'].apply(lambda x: 1 if x > 1 else x)
