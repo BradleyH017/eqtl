@@ -150,6 +150,7 @@ process TRANS_BY_CIS {
     output:
         //path("${outpath}/trans-by-cis_bonf_fdr.tsv", emit: trans_res, optional: true)
         path("trans-by-cis_bonf_fdr.tsv", emit: trans_res, optional: true)
+        //path("trans-by-cis_all.tsv.gz", emit: trans_res_all, optional:true)
 
     script:
       // Use dosage?

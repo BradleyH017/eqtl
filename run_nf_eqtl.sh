@@ -11,7 +11,7 @@
 # export NF_PATH="/software/hgi/installs/anaconda3/envs/nextflow/bin/"
 export REPOS="/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/"
 export EQTL_REPO="${REPOS}/eqtl"
-export INPUT="${EQTL_REPO}/sample_input/TI_fr003_v004-input/input_minimal.nf"
+export INPUT="${EQTL_REPO}/sample_input/TI_fr003_v004-input/input.nf"
 
 # Add Singularity to path
 # PATH=$PATH:/software/singularity/v3.10.0/bin

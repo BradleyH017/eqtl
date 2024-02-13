@@ -146,10 +146,7 @@ def main():
 
     covariates_df=covariates_df.T
     # not a good solution but atm
-    
-    # Drop covariates into the outdir:
-    import shutil
-    shutil.copy(covariates_file, outdir)
+    print(covariates_df.head())
 
     # covariates_df=covariates_df.set_index('IID')
     # to_keep = list(set(covariates_df.index).intersection(set(phenotype_df.columns)))
@@ -201,6 +198,14 @@ def main():
     #                     covariates_df=covariates_df,window=int(options.window),prefix='cis_nominal1',
     #                     output_dir=Directory, write_top=True, write_stats=True,run_eigenmt=True)
 
+    # Drop covariates into the outdir:
+    import shutil
+    shutil.copy(covariates_file, outdir)
+    
+    # Save the expression file used for analysis also
+    phenotype_df.to_csv(f"{outdir}/phenotype_df.tsv", sep = "\t")
+    phenotype_pos_df.to_csv(f"{outdir}/phenotype_pos_df.tsv", sep = "\t")
+    
     
     all_files = glob.glob(f'{outdir}/cis_nominal*.parquet')
     All_Data = pd.DataFrame()
