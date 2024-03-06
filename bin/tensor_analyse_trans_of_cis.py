@@ -193,7 +193,7 @@ def main():
             print("Running trans analysis")
             trans_df_all = trans.map_trans(genotype_df, phenotype_df.loc[phenotype_pos_df['chr']!='chrY'],
                                 covariates_df = covariates_df, batch_size=10000,
-                                return_sparse=True, pval_threshold=1, maf_threshold=0.05)
+                                return_sparse=True, pval_threshold=0.05, maf_threshold=0.05)
 
             # Filter the trans for distance (1Mb)
             trans_df = trans.filter_cis(trans_df_all, phenotype_pos_df.T.to_dict(), variant_df, window=window)
