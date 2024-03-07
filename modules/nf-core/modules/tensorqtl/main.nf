@@ -197,7 +197,7 @@ process TRANS_BY_CIS {
 }
 
 process TRANS_OF_CIS {
-    label 'process_high_memory'
+    label "process_high_memory"
     tag "$condition"
     
     if (workflow.containerEngine == 'singularity' && !params.singularity_pull_docker_container) {
