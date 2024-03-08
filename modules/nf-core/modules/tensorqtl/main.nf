@@ -94,28 +94,31 @@ process OPTIMISE_PCS{
         tuple(val(condition),path(eqtl_dir))
         
     output:
-        path("${outpath}/optimise_nPCs-FDR${alpha_text}.pdf"), emit: optimise_nPCs_plot
-        path("${outpath}/optimise_nPCs-FDR${alpha_text}.txt"), emit: optimise_nPCs
-        path("${outpath}/Cis_eqtls.tsv"), emit: optim_qtl_bin, optional: true
-        path("${outpath}/Cis_eqtls_qval.tsv"), emit: optim_q_qtl_bin, optional: true
-        path("${outpath}/cis_inter1.cis_qtl_top_assoc.txt.gz "), emit: optim_int_qtl_bin, optional: true
-        path("${outpath}/optim_pcs.txt"), emit: optim_var, optional:true
-        path("${outpath}/Covariates.tsv"), emit: optim_covariates, optional:true
-        path("${outpath}/phenotype_df.tsv"), emit: optim_phenotype_file
-        path("${outpath}/phenotype_pos_df.tsv"), emit: optim_phenotype_pos_file
-        path(outpath), emit: out_path, optional: true
+        tuple(
+          val(condition),
+          path("${outpath}/Cis_eqtls.tsv"),
+          path("${outpath}/Covariates.tsv"),
+          path("${outpath}/phenotype_df.tsv"),
+          path("${outpath}/phenotype_pos_df.tsv"),
+          path("${outpath}/Cis_eqtls_qval.tsv"),
+          path("${outpath}/optimise_nPCs-FDR${alpha_text}.pdf"),
+          path("${outpath}/optimise_nPCs-FDR${alpha_text}.txt"),
+          path(outpath),
+          emit: combined_input
+        )
+
     script:
-    sumstats_path = "${params.outdir}/TensorQTL_eQTLS/${condition}/"
-      if (params.TensorQTL.interaction_file?.trim()) {
-        inter_name = file(params.TensorQTL.interaction_file).baseName
-        outpath_end = "interaction_output__${inter_name}"
-    } else {
-        inter_name = "NA"
-        outpath_end = "base_output__base"
-        }
-      alpha = "0.05"
-      alpha_text = alpha.replaceAll("\\.", "pt")
-      outpath = "./OPTIM_pcs/${outpath_end}"
+      sumstats_path = "${params.outdir}/TensorQTL_eQTLS/${condition}/"
+        if (params.TensorQTL.interaction_file?.trim()) {
+          inter_name = file(params.TensorQTL.interaction_file).baseName
+          outpath_end = "interaction_output__${inter_name}"
+      } else {
+          inter_name = "NA"
+          outpath_end = "base_output__base"
+          }
+        alpha = "0.05"
+        alpha_text = alpha.replaceAll("\\.", "pt")
+        outpath = "./OPTIM_pcs/${outpath_end}"
         """  
           mkdir -p ${outpath}
           tensorqtl_optimise_pcs.R ./ ${alpha} ${inter_name} ${condition} ${outpath}
@@ -140,12 +143,8 @@ process TRANS_BY_CIS {
                 overwrite: "true"
 
     input:
-        tuple(val(condition),path(eqtl_dir))
+        combined_input
         each path(plink_files_prefix) 
-        path(optim_q_qtl_bin)
-        path(optim_covariates)
-        path(optim_phenotype_file)
-        path(optim_phenotype_pos_file)
 
     output:
         //path("${outpath}/trans-by-cis_bonf_fdr.tsv", emit: trans_res, optional: true)
@@ -177,21 +176,18 @@ process TRANS_BY_CIS {
 
       """
       tensor_analyse_trans_by_cis.py \
-        --covariates_file ${optim_covariates} \
-        --phenotype_file ${optim_phenotype_file} \
-        --phenotype_pos_file ${optim_phenotype_pos_file} \
+        --covariates_file Covariates.tsv \
+        --phenotype_file phenotype_df.tsv \
+        --phenotype_pos_file phenotype_pos_df.tsv \
         --plink_prefix_path ${plink_files_prefix}/plink_genotypes \
         --outdir "./" \
         --dosage ${dosage} \
         --maf "0.05" \
-        --cis_qval_results ${optim_q_qtl_bin} \
+        --cis_qval_results Cis_eqtls_qval.tsv \
         --alpha ${alpha} \
         --window ${params.windowSize}
 
-      echo ${outpath} > copydir.txt
       """
-      //cp trans-by-cis_bonf_fdr.tsv ${outpath}
-      //"""
 
       
 }
@@ -211,12 +207,8 @@ process TRANS_OF_CIS {
                 overwrite: "true"
 
     input:
-        tuple(val(condition),path(eqtl_dir))
+        combined_input
         each path(plink_files_prefix) 
-        path(optim_q_qtl_bin)
-        path(optim_covariates)
-        path(optim_phenotype_file)
-        path(optim_phenotype_pos_file)
 
     output:
         //path("${outpath}/trans-by-cis_bonf_fdr.tsv", emit: trans_res, optional: true)
@@ -247,18 +239,17 @@ process TRANS_OF_CIS {
 
       """
       tensor_analyse_trans_of_cis.py \
-        --covariates_file ${optim_covariates} \
-        --phenotype_file ${optim_phenotype_file} \
-        --phenotype_pos_file ${optim_phenotype_pos_file} \
+        --covariates_file Covariates.tsv \
+        --phenotype_file phenotype_df.tsv \
+        --phenotype_pos_file phenotype_pos_df.tsv \
         --plink_prefix_path ${plink_files_prefix}/plink_genotypes \
         --outdir "./" \
         --dosage ${dosage} \
         --maf "0.05" \
-        --cis_qval_results ${optim_q_qtl_bin} \
+        --cis_qval_results Cis_eqtls_qval.tsv \
         --alpha ${alpha} \
         --window ${params.windowSize}
 
-      echo ${outpath} > copydir.txt
       """
       //cp trans-by-cis_bonf_fdr.tsv ${outpath}
       //"""
@@ -288,26 +279,19 @@ workflow TENSORQTL_eqtls{
           PREP_OPTIMISE_PCS(prep_optim_pc_channel)
           // Run the optimisation to get the eQTL output with the most eGenes
           OPTIMISE_PCS(PREP_OPTIMISE_PCS.out)
+          channel_dsb2 = PREP_OPTIMISE_PCS.out.combine(OPTIMISE_PCS.out.combined_input, by: 0)
           if(params.TensorQTL.trans_by_cis){
             log.info 'Running trans-by-cis analysis on optimum nPCs'
             TRANS_BY_CIS(
-              PREP_OPTIMISE_PCS.out,
-              plink_genotype,
-              OPTIMISE_PCS.out.optim_q_qtl_bin,
-              OPTIMISE_PCS.out.optim_covariates,
-              OPTIMISE_PCS.out.optim_phenotype_file,
-              OPTIMISE_PCS.out.optim_phenotype_pos_file
+              channel_dsb2,
+              plink_genotype
             )
           }
           if(params.TensorQTL.trans_of_cis){
             log.info 'Running trans-of-cis analysis on optimum nPCs'
             TRANS_OF_CIS(
-              PREP_OPTIMISE_PCS.out,
-              plink_genotype,
-              OPTIMISE_PCS.out.optim_q_qtl_bin,
-              OPTIMISE_PCS.out.optim_covariates,
-              OPTIMISE_PCS.out.optim_phenotype_file,
-              OPTIMISE_PCS.out.optim_phenotype_pos_file
+              channel_dsb2,
+              plink_genotype
             )
           } 
   }
