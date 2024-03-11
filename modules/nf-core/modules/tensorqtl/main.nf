@@ -4,7 +4,7 @@ process TENSORQTL {
     label "${tensor_label}"
     tag "$condition, $nr_phenotype_pcs"
     
-    publishDir  path: "${params.outdir}/TensorQTL_eQTLS/${condition}/",
+    publishDir  path: "${params.outdir}/TensorQTL_eQTLS/${condition}_symlink/",
                 overwrite: "true"
   
 
@@ -140,10 +140,20 @@ process TRANS_BY_CIS {
 
     publishDir  path: "${params.outdir}/TensorQTL_eQTLS/${condition}",
                 mode: "copy",
-                overwrite: "true"
+                overwrite: "false"
 
     input:
-        combined_input
+        tuple(
+          val(condition),
+          path(outpath),
+          path("${outpath}/Cis_eqtls.tsv"),
+          path("${outpath}/Covariates.tsv"),
+          path("${outpath}/phenotype_df.tsv"),
+          path("${outpath}/phenotype_pos_df.tsv"),
+          path("${outpath}/Cis_eqtls_qval.tsv"),
+          path("${outpath}/optimise_nPCs-FDR${alpha_text}.pdf"),
+          path("${outpath}/optimise_nPCs-FDR${alpha_text}.txt")
+        )
         each path(plink_files_prefix) 
 
     output:
@@ -172,18 +182,18 @@ process TRANS_BY_CIS {
         outpath_end = "base_output__base"
       }
       */
-      outpath = "${launchDir}/results/TensorQTL_eQTLS/${condition}/OPTIM_pcs/base_output__base/"
+      //outpath = "${launchDir}/results/TensorQTL_eQTLS/${condition}/OPTIM_pcs/base_output__base"
 
       """
       tensor_analyse_trans_by_cis.py \
-        --covariates_file Covariates.tsv \
-        --phenotype_file phenotype_df.tsv \
-        --phenotype_pos_file phenotype_pos_df.tsv \
+        --covariates_file ${condition}_symlink/Covariates.tsv \
+        --phenotype_file ${condition}_symlink/phenotype_df.tsv \
+        --phenotype_pos_file ${condition}_symlink/phenotype_pos_df.tsv \
         --plink_prefix_path ${plink_files_prefix}/plink_genotypes \
         --outdir "./" \
         --dosage ${dosage} \
         --maf "0.05" \
-        --cis_qval_results Cis_eqtls_qval.tsv \
+        --cis_qval_results ${condition}_symlink/Cis_eqtls_qval.tsv \
         --alpha ${alpha} \
         --window ${params.windowSize}
 
@@ -204,10 +214,20 @@ process TRANS_OF_CIS {
 
     publishDir  path: "${params.outdir}/TensorQTL_eQTLS/${condition}",
                 mode: "copy",
-                overwrite: "true"
+                overwrite: "false"
 
     input:
-        combined_input
+        tuple(
+          val(condition),
+          path(outpath),
+          path("${outpath}/Cis_eqtls.tsv"),
+          path("${outpath}/Covariates.tsv"),
+          path("${outpath}/phenotype_df.tsv"),
+          path("${outpath}/phenotype_pos_df.tsv"),
+          path("${outpath}/Cis_eqtls_qval.tsv"),
+          path("${outpath}/optimise_nPCs-FDR${alpha_text}.pdf"),
+          path("${outpath}/optimise_nPCs-FDR${alpha_text}.txt")
+        )
         each path(plink_files_prefix) 
 
     output:
@@ -235,18 +255,18 @@ process TRANS_OF_CIS {
         outpath_end = "base_output__base"
       }
       */
-      outpath = "${launchDir}/results/TensorQTL_eQTLS/${condition}/OPTIM_pcs/base_output__base/"
+      //outpath = "${launchDir}/results/TensorQTL_eQTLS/${condition}/OPTIM_pcs/base_output__base"
 
       """
       tensor_analyse_trans_of_cis.py \
-        --covariates_file Covariates.tsv \
-        --phenotype_file phenotype_df.tsv \
-        --phenotype_pos_file phenotype_pos_df.tsv \
+        --covariates_file ${condition}_symlink/Covariates.tsv \
+        --phenotype_file ${condition}_symlink/phenotype_df.tsv \
+        --phenotype_pos_file ${condition}_symlink/phenotype_pos_df.tsv \
         --plink_prefix_path ${plink_files_prefix}/plink_genotypes \
         --outdir "./" \
         --dosage ${dosage} \
         --maf "0.05" \
-        --cis_qval_results Cis_eqtls_qval.tsv \
+        --cis_qval_results ${condition}_symlink/Cis_eqtls_qval.tsv \
         --alpha ${alpha} \
         --window ${params.windowSize}
 
@@ -280,6 +300,8 @@ workflow TENSORQTL_eqtls{
           // Run the optimisation to get the eQTL output with the most eGenes
           OPTIMISE_PCS(PREP_OPTIMISE_PCS.out)
           channel_dsb2 = PREP_OPTIMISE_PCS.out.combine(OPTIMISE_PCS.out.combined_input, by: 0)
+          channel_dsb2.view { "Combined: $it" }
+          
           if(params.TensorQTL.trans_by_cis){
             log.info 'Running trans-by-cis analysis on optimum nPCs'
             TRANS_BY_CIS(
@@ -293,6 +315,6 @@ workflow TENSORQTL_eqtls{
               channel_dsb2,
               plink_genotype
             )
-          } 
+          }
   }
 }
