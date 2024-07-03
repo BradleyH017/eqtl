@@ -138,7 +138,7 @@ process TRANS_BY_CIS {
       container "${params.eqtl_docker}"
     }
 
-    publishDir  path: "${params.outdir}/TensorQTL_eQTLS/${condition}",
+    publishDir  path: "${params.outdir}/TensorQTL_eQTLS/${condition}/",
                 mode: "copy",
                 overwrite: "true"
 
@@ -186,14 +186,14 @@ process TRANS_BY_CIS {
 
       """
       tensor_analyse_trans_by_cis.py \
-        --covariates_file ${condition}/Covariates.tsv \
-        --phenotype_file ${condition}/phenotype_df.tsv \
-        --phenotype_pos_file ${condition}/phenotype_pos_df.tsv \
+        --covariates_file ${condition}_symlink/Covariates.tsv \
+        --phenotype_file ${condition}_symlink/phenotype_df.tsv \
+        --phenotype_pos_file ${condition}_symlink/phenotype_pos_df.tsv \
         --plink_prefix_path ${plink_files_prefix}/plink_genotypes \
         --outdir "./" \
         --dosage ${dosage} \
         --maf "0.05" \
-        --cis_qval_results ${condition}/Cis_eqtls_qval.tsv \
+        --cis_qval_results ${condition}_symlink/Cis_eqtls_qval.tsv \
         --alpha ${alpha} \
         --window ${params.windowSize}
 
@@ -233,6 +233,7 @@ process TRANS_OF_CIS {
     output:
         //path("${outpath}/trans-by-cis_bonf_fdr.tsv", emit: trans_res, optional: true)
         path("trans-of-cis_all.tsv", emit: trans_res, optional: true)
+        path("trans-of-cis_filt.tsv", emit: trans_res_filt, optional: true)
 
     script:
       // Use dosage?
@@ -259,14 +260,14 @@ process TRANS_OF_CIS {
 
       """
       tensor_analyse_trans_of_cis.py \
-        --covariates_file ${condition}/Covariates.tsv \
-        --phenotype_file ${condition}/phenotype_df.tsv \
-        --phenotype_pos_file ${condition}/phenotype_pos_df.tsv \
+        --covariates_file ${condition}_symlink/Covariates.tsv \
+        --phenotype_file ${condition}_symlink/phenotype_df.tsv \
+        --phenotype_pos_file ${condition}_symlink/phenotype_pos_df.tsv \
         --plink_prefix_path ${plink_files_prefix}/plink_genotypes \
         --outdir "./" \
         --dosage ${dosage} \
         --maf "0.05" \
-        --cis_qval_results ${condition}/Cis_eqtls_qval.tsv \
+        --cis_qval_results ${condition}_symlink/Cis_eqtls_qval.tsv \
         --alpha ${alpha} \
         --window ${params.windowSize}
 
@@ -309,13 +310,14 @@ workflow TENSORQTL_eqtls{
               plink_genotype
             )
           }
-          /*
+          
           if(params.TensorQTL.trans_of_cis){
             log.info 'Running trans-of-cis analysis on optimum nPCs'
             TRANS_OF_CIS(
               channel_dsb2,
               plink_genotype
             )
-          }*/
+          }
+          
   }
 }

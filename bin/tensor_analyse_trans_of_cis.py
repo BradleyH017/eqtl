@@ -210,6 +210,11 @@ def main():
             trans_df.to_csv(f"{outdir}/trans-of-cis_all.tsv", sep = "\t", index=False)
             print("Saved the corrected results")
             
+            # Also save filtered
+            trans_df_filt = trans_df[trans_df['pval'] < trans_df['genome_wide_mt_p_thresh']]
+            trans_df_filt.to_csv(f"{outdir}/trans-of-cis_filt.tsv", sep = "\t", index=False)
+            print("Saved the corrected results")
+            
             # Save all results
             #print("Saving all trans results")
             #trans_df.to_csv(f"{outdir}/trans-by-cis_all.tsv.gz", compression='gzip', sep = "\t", index=False)
